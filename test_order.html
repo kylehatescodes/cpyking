@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Test Order Submission</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 24px;
+        background: #f3f4f6;
+        color: #111827;
+      }
+
+      .card {
+        max-width: 420px;
+        margin: 0 auto;
+        padding: 24px;
+        background: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+      }
+
+      h1 {
+        margin-top: 0;
+        font-size: 1.5rem;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 14px;
+        font-weight: 600;
+      }
+
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        margin-top: 6px;
+        padding: 10px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 1rem;
+      }
+
+      button {
+        width: 100%;
+        padding: 12px 14px;
+        border: 0;
+        border-radius: 8px;
+        background: #2563eb;
+        color: #ffffff;
+        font-size: 1rem;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background: #1d4ed8;
+      }
+
+      .note {
+        margin-top: 12px;
+        font-size: 0.9rem;
+        color: #4b5563;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Backend Order Test</h1>
+      <p class="note">Submit a simple order payload to <code>http://127.0.0.1:8000/api/orders/</code>.</p>
+
+      <form id="orderForm">
+        <label>
+          Product ID
+          <input type="number" id="product_id" min="1" step="1" required />
+        </label>
+
+        <label>
+          Quantity
+          <input type="number" id="quantity" min="1" step="1" required value="1" />
+        </label>
+
+        <button type="submit">Submit Order</button>
+      </form>
+    </div>
+
+    <script>
+      const form = document.getElementById('orderForm');
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        const productId = Number(document.getElementById('product_id').value);
+        const quantity = Number(document.getElementById('quantity').value);
+
+        const payload = {
+          customer: {
+            name: '',
+            phone: '',
+            email: '',
+          },
+          products: [
+            {
+              product_id: productId,
+              quantity: quantity,
+            },
+          ],
+        };
+
+        try {
+          const response = await fetch('http://127.0.0.1:8000/api/orders/', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+          });
+
+          const data = await response.json();
+          console.log('Response status:', response.status);
+          console.log('Response body:', data);
+        } catch (error) {
+          console.error('Request failed:', error);
+        }
+      });
+    </script>
+  </body>
+</html>

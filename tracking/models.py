@@ -132,6 +132,9 @@ class Order(TimeStampedModel):
         CANCELED = "canceled", "Canceled"
 
     order_number = models.BigAutoField(primary_key=True)
+    customer_name = models.CharField(max_length=120, blank=True, default="")
+    customer_phone = models.CharField(max_length=32, blank=True, default="")
+    customer_email = models.EmailField(blank=True, default="")
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.OPEN, db_index=True)
     placed_at = models.DateTimeField(auto_now_add=True, db_index=True)
     completed_at = models.DateTimeField(null=True, blank=True, db_index=True)

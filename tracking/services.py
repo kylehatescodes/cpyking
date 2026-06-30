@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Any
 
 from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
 
 from .models import InventoryBalance, MenuItemIngredient, Order
+
+
+logger = logging.getLogger(__name__)
 
 
 class InsufficientStock(Exception):
@@ -42,6 +47,8 @@ class InventoryDepletionService:
         quantities_by_menu_item: dict[int, Decimal] = {
             line.menu_item_id: Decimal(line.quantity) for line in order_lines
         }
+        required_by_ingredient: dict[int, Decimal] = {}
+        ingredient_names: dict[int, str] = {}
 
         recipe_rows = (
             MenuItemIngredient.objects.filter(menu_item_id__in=quantities_by_menu_item.keys())
@@ -59,12 +66,15 @@ class InventoryDepletionService:
             required_by_ingredient[ingredient_id] = required_by_ingredient.get(ingredient_id, Decimal("0")) + required_qty
             ingredient_names[ingredient_id] = row["ingredient__name"]
 
-        inventory_rows = (
+        inventory_balances = list(
             InventoryBalance.objects.select_for_update()
+            .select_related("ingredient")
             .filter(ingredient_id__in=required_by_ingredient.keys())
-            .values("ingredient_id", "on_hand_qty")
         )
-        available_by_ingredient = {row["ingredient_id"]: Decimal(row["on_hand_qty"]) for row in inventory_rows}
+        available_by_ingredient = {
+            balance.ingredient_id: Decimal(balance.on_hand_qty)
+            for balance in inventory_balances
+        }
 
         shortages: list[InventoryShortage] = []
         for ingredient_id, required_qty in required_by_ingredient.items():
@@ -94,3 +104,26 @@ class InventoryDepletionService:
         Order.objects.filter(pk=order.pk, inventory_depleted_at__isnull=True).update(
             inventory_depleted_at=timezone.now(),
         )
+
+
+class KitchenDisplayQueueService:
+    """Builds and publishes a KDS payload outside of the order save path."""
+
+    def enqueue_order(self, order: Order) -> dict[str, Any]:
+        order = Order.objects.prefetch_related("lines__menu_item").get(pk=order.pk)
+        payload = {
+            "order_number": order.order_number,
+            "placed_at": order.placed_at.isoformat(),
+            "status": order.status,
+            "items": [
+                {
+                    "menu_item_id": line.menu_item_id,
+                    "menu_item_name": line.menu_item.name,
+                    "quantity": line.quantity,
+                    "line_total": str(line.line_total),
+                }
+                for line in order.lines.all()
+            ],
+        }
+        logger.info("Queued order %s for KDS", order.order_number, extra={"kds_payload": payload})
+        return payload
